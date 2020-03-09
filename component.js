@@ -1,156 +1,38 @@
 "use strict";
 
-define("nodes/components/driver-skel/component", ["exports", "@ember/component", "shared/mixins/cluster-driver", "./template", "@ember/service", "@ember/object", "rsvp", "@ember/object/computed"], function (exports, _component, _clusterDriver, _template, _service, _object, _rsvp, _computed) {
+define("nodes/components/driver-skel/component", ["exports", "@ember/object/computed", "@ember/object", "@ember/component", "shared/mixins/node-driver", "./template", "@ember/service", "rsvp"], function (exports, _computed, _object, _component, _nodeDriver, _template, _service, _rsvp) {
   "use strict";
 
   Object.defineProperty(exports, "__esModule", {
     value: true
   });
-  var ENDPOINT = 'ecs.aliyuncs.com';
+  var ENDPOINT = 'https://ecs.aliyuncs.com';
   var PAGE_SIZE = 50;
-  var K8S_1_11_5 = '1.11.5';
-  var K8S_1_12_6_1 = '1.12.6-aliyun.1';
-  var VERSIONS = [{
-    value: K8S_1_12_6_1,
-    label: K8S_1_12_6_1
-  }, {
-    value: K8S_1_11_5,
-    label: K8S_1_11_5
+  var NONE_OPT_DISK = [{
+    value: 'cloud'
   }];
-  var MANAGED_VERSIONS = [{
-    value: K8S_1_12_6_1,
-    label: K8S_1_12_6_1
-  }];
-  var KUBERNETES = 'Kubernetes';
-  var MANAGED = 'ManagedKubernetes';
-  var DISKS = [{
-    label: 'clusterNew.aliyunkcs.disk.ssd',
-    value: 'cloud_ssd'
-  }, {
-    label: 'clusterNew.aliyunkcs.disk.efficiency',
+  var DEFAULT_IMAGE = 'ubuntu_16_04_64';
+  var OPT_DISK = [{
     value: 'cloud_efficiency'
+  }, {
+    value: 'cloud_ssd'
   }];
-  var CLUSTER_TYPES = [{
-    label: 'clusterNew.aliyunkcs.clusters.k8s',
-    value: KUBERNETES
-  }, {
-    label: 'clusterNew.aliyunkcs.clusters.managed',
-    value: MANAGED
-  }];
-  var REGIONS = [{
-    label: 'cn-qingdao',
-    value: 'cn-qingdao'
-  }, {
-    label: 'cn-beijing',
-    value: 'cn-beijing',
-    managed: true
-  }, {
-    label: 'cn-zhangjiakou',
-    value: 'cn-zhangjiakou'
-  }, {
-    label: 'cn-shanghai',
-    value: 'cn-shanghai',
-    managed: true
-  }, {
-    label: 'cn-shenzhen',
-    value: 'cn-shenzhen'
-  }, {
-    label: 'cn-hangzhou',
-    value: 'cn-hangzhou',
-    managed: true
-  }, {
-    label: 'cn-hongkong',
-    value: 'cn-hongkong'
-  }, {
-    label: 'cn-huhehaote',
-    value: 'cn-huhehaote'
-  }, {
-    label: 'ap-northeast-1',
-    value: 'ap-northeast-1'
-  }, {
-    label: 'ap-south-1',
-    value: 'ap-south-1',
-    managed: true
-  }, {
-    label: 'ap-southeast-1',
-    value: 'ap-southeast-1',
-    managed: true
-  }, {
-    label: 'ap-southeast-2',
-    value: 'ap-southeast-2'
-  }, {
-    label: 'ap-southeast-5',
-    value: 'ap-southeast-5',
-    managed: true
-  }, {
-    label: 'us-east-1',
-    value: 'us-east-1'
-  }, {
-    label: 'us-west-1',
-    value: 'us-west-1'
-  }, {
-    label: 'me-east-1',
-    value: 'me-east-1'
-  }, {
-    label: 'eu-central-1',
-    value: 'eu-central-1'
-  }, {
-    label: 'ap-southeast-3',
-    value: 'ap-southeast-3',
-    managed: true
-  }];
-  exports.default = _component.default.extend(_clusterDriver.default, {
+  var DEFAULT_INSTANCE_TYPE = 'ecs.g5.large';
+  exports.default = _component.default.extend(_nodeDriver.default, {
     intl: (0, _service.inject)(),
+    settings: (0, _service.inject)(),
     layout: _template.default,
-    configField: 'aliyunEngineConfig',
-    aliyunClient: null,
+    driverName: 'aliyunecs',
+    zones: null,
+    regions: null,
+    securityGroups: null,
+    images: null,
+    instanceTypes: null,
+    ecsClient: null,
     step: 1,
-    regionChoices: REGIONS,
-    versionChoices: VERSIONS,
-    managedVersionChoices: MANAGED_VERSIONS,
-    diskChoices: DISKS,
-    storageDiskChoices: null,
-    zoneChoices: null,
-    vpcChoices: null,
-    sgChoices: null,
-    keyChoices: null,
-    allSubnets: null,
-    allInstances: null,
-    editing: (0, _computed.equal)('mode', 'edit'),
-    isNew: (0, _computed.equal)('mode', 'new'),
-    init: function init() {
-      this._super.apply(this, arguments);
-
-      var config = (0, _object.get)(this, 'cluster.aliyunEngineConfig');
-
-      if (!config) {
-        config = this.get('globalStore').createRecord({
-          type: 'aliyunEngineConfig',
-          accessKeyId: null,
-          accessKeySecret: null,
-          regionId: 'cn-beijing',
-          clusterType: KUBERNETES,
-          kubernetesVersion: K8S_1_11_5,
-          zoneId: null,
-          snatEntry: true,
-          publicSlb: true,
-          masterSystemDiskSize: 120,
-          masterSystemDiskCategory: 'cloud_efficiency',
-          masterInstanceType: 'ecs.n1.large',
-          workerSystemDiskSize: 120,
-          workerSystemDiskCategory: 'cloud_efficiency',
-          workerDataDiskSize: 120,
-          workerDataDiskCategory: 'cloud_efficiency',
-          workerInstanceType: 'ecs.n1.large',
-          numOfNodes: 3,
-          workerDataDisk: true,
-          keyPair: null
-        });
-        (0, _object.set)(this, 'cluster.aliyunEngineConfig', config);
-      }
-    },
+    config: (0, _computed.alias)('model.aliyunecsConfig'),
     actions: {
-      aliyunLogin: function aliyunLogin(cb) {
+      alyLogin: function alyLogin(cb) {
         var _this = this;
 
         (0, _object.setProperties)(this, {
@@ -160,15 +42,15 @@ define("nodes/components/driver-skel/component", ["exports", "@ember/component",
         });
         var errors = (0, _object.get)(this, 'errors') || [];
         var intl = (0, _object.get)(this, 'intl');
-        var accessKeyId = (0, _object.get)(this, 'config.accessKeyId');
-        var accessKeySecret = (0, _object.get)(this, 'config.accessKeySecret');
+        var accessKey = (0, _object.get)(this, 'config.accessKeyId');
+        var accessSecret = (0, _object.get)(this, 'config.accessKeySecret');
 
-        if (!accessKeyId) {
-          errors.push(intl.t('clusterNew.aliyunkcs.accessKeyId.required'));
+        if (!accessKey) {
+          errors.push(intl.t('nodeDriver.aliyunecs.errors.accessKeyRequired'));
         }
 
-        if (!accessKeySecret) {
-          errors.push(intl.t('clusterNew.aliyunkcs.accessKeySecret.required'));
+        if (!accessSecret) {
+          errors.push(intl.t('nodeDriver.aliyunecs.errors.accessSecretRequired'));
         }
 
         if (errors.length > 0) {
@@ -177,26 +59,69 @@ define("nodes/components/driver-skel/component", ["exports", "@ember/component",
           return;
         }
 
-        return this.fetch('Zone', 'Zones').then(function (zones) {
-          (0, _object.set)(_this, 'zoneChoices', zones.sortBy('label'));
+        var ecs;
 
-          if (!(0, _object.get)(_this, 'config.zoneId') && (0, _object.get)(_this, 'zoneChoices.length')) {
-            (0, _object.set)(_this, 'config.zoneId', (0, _object.get)(_this, 'zoneChoices.firstObject.value'));
-          }
+        try {
+          var location = window.location;
+          var endpoint = (0, _object.get)(this, 'config.apiEndpoint') ? (0, _object.get)(this, 'config.apiEndpoint') : ENDPOINT;
+          endpoint = "".concat((0, _object.get)(this, 'app.proxyEndpoint'), "/").concat(endpoint.replace('//', '/'));
+          endpoint = "".concat(location.origin).concat(endpoint);
+          ecs = new ALY.ECS({
+            accessKeyId: (0, _object.get)(this, 'config.accessKeyId'),
+            secretAccessKey: (0, _object.get)(this, 'config.accessKeySecret'),
+            apiVersion: '2014-05-26',
+            endpoint: endpoint
+          });
+          ecs.describeRegions({}, function (err, res) {
+            if (err) {
+              var _errors = (0, _object.get)(_this, 'errors') || [];
 
-          (0, _object.set)(_this, 'step', 2);
-          cb(true);
-        }).catch(function () {
-          cb(false);
-        });
+              _errors.pushObject(err.message || err);
+
+              (0, _object.set)(_this, 'errors', _errors);
+              cb();
+              return;
+            }
+
+            (0, _object.set)(_this, 'ecsClient', ecs);
+            (0, _object.set)(_this, 'regions', res.Regions.Region.map(function (region) {
+              return {
+                value: region.RegionId,
+                label: region.LocalName
+              };
+            }));
+
+            _this.regionDidChange();
+
+            (0, _object.set)(_this, 'step', 2);
+            cb();
+          });
+        } catch (err) {
+          var _errors2 = (0, _object.get)(this, 'errors') || [];
+
+          _errors2.pushObject(err.message || err);
+
+          (0, _object.set)(this, 'errors', _errors2);
+          cb();
+          return;
+        }
       },
-      configMaster: function configMaster(cb) {
+      loadStorageTypes: function loadStorageTypes(cb) {
+        (0, _object.set)(this, 'errors', null);
         var errors = (0, _object.get)(this, 'errors') || [];
         var intl = (0, _object.get)(this, 'intl');
-        var zoneId = (0, _object.get)(this, 'config.zoneId');
+        var zone = (0, _object.get)(this, 'config.zone');
+        var vpcId = (0, _object.get)(this, 'config.vpcId');
+        var vswitchId = (0, _object.get)(this, 'config.vswitchId');
 
-        if (!zoneId) {
-          errors.push(intl.t('clusterNew.aliyunkcs.zoneId.required'));
+        if (zone) {
+          if (!vpcId) {
+            errors.push(intl.t('nodeDriver.aliyunecs.errors.vpcIdRequired'));
+          }
+
+          if (!vswitchId) {
+            errors.push(intl.t('nodeDriver.aliyunecs.errors.vswitchIdRequired'));
+          }
         }
 
         if (errors.length > 0) {
@@ -205,159 +130,309 @@ define("nodes/components/driver-skel/component", ["exports", "@ember/component",
           return;
         }
 
-        this.setInstances();
-        var instances = (0, _object.get)(this, 'selectedZone.raw.AvailableInstanceTypes.InstanceTypes');
-        var found = instances.indexOf((0, _object.get)(this, 'config.masterInstanceType'));
-
-        if (!found) {
-          (0, _object.set)(this, 'config.masterInstanceType', null);
+        if (!(0, _object.get)(this, 'config.securityGroup')) {
+          (0, _object.set)(this, 'config.securityGroup', 'docker-machine');
         }
 
         (0, _object.set)(this, 'step', 3);
-        cb(true);
+        this.diskCategoryChoicesDidChange();
+        cb();
       },
-      configWorker: function configWorker(cb) {
+      loadInstanceTypes: function loadInstanceTypes(cb) {
         var _this2 = this;
 
-        this.setInstances();
-        var errors = (0, _object.get)(this, 'errors') || [];
-        var intl = (0, _object.get)(this, 'intl');
-        var masterInstanceType = (0, _object.get)(this, 'config.masterInstanceType');
+        this.fetch('Image', 'Images').then(function (images) {
+          (0, _object.set)(_this2, 'images', images.filter(function (image) {
+            return image.raw.OSType === 'linux' && ((_this2, 'config.ioOptimized') === 'none' || image.raw.IsSupportIoOptimized);
+          }).map(function (image) {
+            return {
+              label: image.raw.ImageOwnerAlias === 'system' ? image.raw.OSName : image.raw.ImageName,
+              value: image.value,
+              raw: image.raw
+            };
+          }));
+          var imageId = (0, _object.get)(_this2, 'config.imageId');
+          var found = (0, _object.get)(_this2, 'images').findBy('value', imageId);
 
-        if (!masterInstanceType && (0, _object.get)(this, 'config.clusterType') === KUBERNETES) {
-          errors.push(intl.t('clusterNew.aliyunkcs.instanceType.required'));
-        }
-
-        if (errors.length > 0) {
-          (0, _object.set)(this, 'errors', errors);
-          cb();
-          return;
-        }
-
-        var instances = (0, _object.get)(this, 'selectedZone.raw.AvailableInstanceTypes.InstanceTypes');
-        var found = instances.indexOf((0, _object.get)(this, 'config.workerInstanceType')) > -1;
-
-        if (!found) {
-          (0, _object.set)(this, 'config.workerInstanceType', null);
-        }
-
-        return this.fetch('KeyPair', 'KeyPairs').then(function (keyChoices) {
-          (0, _object.set)(_this2, 'keyChoices', keyChoices);
-
-          if (!(0, _object.get)(_this2, 'config.keyPair') && (0, _object.get)(_this2, 'keyChoices.length')) {
-            (0, _object.set)(_this2, 'config.keyPair', (0, _object.get)(_this2, 'keyChoices.firstObject.value'));
+          if (!found) {
+            var ubuntu = (0, _object.get)(_this2, 'images').find(function (i) {
+              return (0, _object.get)(i, 'value').startsWith(DEFAULT_IMAGE);
+            });
+            var defaultImage = ubuntu ? ubuntu.value : (0, _object.get)(_this2, 'images.firstObject.value');
+            (0, _object.set)(_this2, 'config.imageId', defaultImage);
           }
 
-          (0, _object.set)(_this2, 'step', 4);
-          cb(true);
-        }).catch(function () {
-          cb(false);
-        });
-      },
-      save: function save(cb) {
-        (0, _object.setProperties)(this, {
-          'errors': null
-        });
-        var errors = (0, _object.get)(this, 'errors') || [];
-        var intl = (0, _object.get)(this, 'intl');
-        var keyPair = (0, _object.get)(this, 'config.keyPair');
-        var workerInstanceType = (0, _object.get)(this, 'config.workerInstanceType');
+          _this2.fetch('InstanceType', 'InstanceTypes').then(function (instanceTypes) {
+            _this2.fetchAvailableResources().then(function (availableResources) {
+              (0, _object.set)(_this2, 'instanceTypes', instanceTypes.filter(function (instanceType) {
+                return availableResources.indexOf(instanceType.value) > -1;
+              }).map(function (instanceType) {
+                return {
+                  group: instanceType.raw.InstanceTypeFamily,
+                  value: instanceType.value,
+                  label: "".concat(instanceType.raw.InstanceTypeId, " ( ").concat(instanceType.raw.CpuCoreCount, " ").concat(instanceType.raw.CpuCoreCount > 1 ? 'Cores' : 'Core', " ").concat(instanceType.raw.MemorySize, "GB RAM )")
+                };
+              }));
+              var instanceType;
 
-        if (!workerInstanceType) {
-          errors.push(intl.t('clusterNew.aliyunkcs.instanceType.required'));
-        }
+              if ((0, _object.get)(_this2, 'instanceTypes').findBy('value', (0, _object.get)(_this2, 'config.instanceType'))) {
+                instanceType = (0, _object.get)(_this2, 'config.instanceType');
+              } else {
+                instanceType = (0, _object.get)(_this2, 'instanceTypes.firstObject.value');
+              }
 
-        if (!keyPair) {
-          errors.push(intl.t('clusterNew.aliyunkcs.keyPair.required'));
-        }
-
-        if (errors.length > 0) {
-          (0, _object.set)(this, 'errors', errors);
+              (0, _object.set)(_this2, 'config.instanceType', instanceType);
+              (0, _object.set)(_this2, 'step', 4);
+              cb();
+            });
+          }).catch(function (err) {
+            var errors = (0, _object.get)(_this2, 'errors') || [];
+            errors.pushObject(err.message || err);
+            (0, _object.set)(_this2, 'errors', errors);
+            cb();
+            return;
+          });
+        }).catch(function (err) {
+          var errors = (0, _object.get)(_this2, 'errors') || [];
+          errors.pushObject(err.message || err);
+          (0, _object.set)(_this2, 'errors', errors);
           cb();
           return;
-        }
-
-        this.send('driverSave', cb);
-      }
-    },
-    clusterNameDidChange: (0, _object.observer)('cluster.name', function () {
-      (0, _object.setProperties)(this, {
-        'config.name': (0, _object.get)(this, 'cluster.name'),
-        'config.displayName': (0, _object.get)(this, 'cluster.name')
-      });
-    }),
-    clusterTypeDidChange: (0, _object.observer)('config.clusterType', function () {
-      if ((0, _object.get)(this, 'config.clusterType') === KUBERNETES) {
-        (0, _object.set)(this, 'config.kubernetesVersion', (0, _object.get)(VERSIONS, 'firstObject.value'));
-      } else {
-        (0, _object.set)(this, 'config.kubernetesVersion', (0, _object.get)(MANAGED_VERSIONS, 'firstObject.value'));
-      }
-    }),
-    minNumOfNodes: (0, _object.computed)('config.clusterType', function () {
-      return (0, _object.get)(this, 'config.clusterType') === KUBERNETES ? 0 : 2;
-    }),
-    selectedZone: (0, _object.computed)('config.zoneId', 'zoneChoices', function () {
-      var zoneChoices = (0, _object.get)(this, 'zoneChoices') || [];
-      return zoneChoices.findBy('value', (0, _object.get)(this, 'config.zoneId'));
-    }),
-    clusterTypeChoices: (0, _object.computed)('config.regionId', 'zoneChoices', function () {
-      var region = REGIONS.findBy('value', (0, _object.get)(this, 'config.regionId'));
-
-      if (region && (0, _object.get)(region, 'managed')) {
-        return CLUSTER_TYPES;
-      } else {
-        return CLUSTER_TYPES.filter(function (type) {
-          return (0, _object.get)(type, 'value') !== MANAGED;
         });
       }
-    }),
-    setInstances: function setInstances() {
-      var instances = (0, _object.get)(this, 'selectedZone.raw.AvailableInstanceTypes.InstanceTypes');
-      (0, _object.set)(this, 'instanceChoices', instances.map(function (i) {
-        var g = i.split('.')[1];
-        return {
-          group: g,
-          label: i,
-          value: i
-        };
-      }));
     },
-    fetch: function fetch(resource, plural) {
+    zoneDidChange: (0, _object.observer)('config.zone', function () {
       var _this3 = this;
 
-      var page = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-      (0, _object.set)(this, 'errors', []);
-      var ecs = (0, _object.get)(this, 'ecsClient');
+      if ((0, _object.get)(this, 'config.vpcId') && !(0, _object.get)(this, 'vswitches')) {
+        this.fetch('VSwitch', 'VSwitches').then(function (vswitches) {
+          (0, _object.set)(_this3, 'vswitches', vswitches);
 
-      if (!ecs) {
-        ecs = new ALY.ECS({
-          accessKeyId: (0, _object.get)(this, 'config.accessKeyId'),
-          secretAccessKey: (0, _object.get)(this, 'config.accessKeySecret'),
-          apiVersion: '2014-05-26',
-          endpoint: "".concat(window.location.origin, "/meta/proxy/https:/").concat(ENDPOINT)
+          _this3.resetVswitch();
+        });
+      } else {
+        this.resetVswitch();
+      }
+    }),
+    vpcDidChange: (0, _object.observer)('config.vpcId', function () {
+      var _this4 = this;
+
+      var vpcId = (0, _object.get)(this, 'config.vpcId');
+
+      if (vpcId) {
+        this.fetch('VSwitch', 'VSwitches').then(function (vswitches) {
+          (0, _object.set)(_this4, 'vswitches', vswitches);
+          var selectedVSwitch = (0, _object.get)(_this4, 'config.vswitchId');
+
+          if (selectedVSwitch) {
+            var found = vswitches.findBy('value', selectedVSwitch);
+
+            if (!found) {
+              (0, _object.set)(_this4, 'config.vswitchId', null);
+            }
+          }
+        });
+        this.fetch('SecurityGroup', 'SecurityGroups').then(function (securityGroups) {
+          (0, _object.set)(_this4, 'securityGroups', securityGroups);
+          var selectedSecurityGroup = (0, _object.get)(_this4, 'config.securityGroup');
+
+          if (selectedSecurityGroup) {
+            var found = securityGroups.findBy('value', selectedSecurityGroup);
+
+            if (!found) {
+              (0, _object.set)(_this4, 'config.securityGroup', 'docker-machine');
+            }
+          }
+        });
+      } else {
+        (0, _object.set)(this, 'config.vswitchId', null);
+        (0, _object.set)(this, 'config.securityGroup', 'docker-machine');
+      }
+    }),
+    regionDidChange: (0, _object.observer)('config.region', function () {
+      var _this5 = this;
+
+      var region = (0, _object.get)(this, 'config.region');
+
+      if (region) {
+        this.fetch('Vpc', 'Vpcs').then(function (vpcs) {
+          (0, _object.set)(_this5, 'vpcs', vpcs);
+          var selectedVPC = (0, _object.get)(_this5, 'config.vpcId');
+
+          if (selectedVPC) {
+            var found = vpcs.findBy('value', selectedVPC);
+
+            if (!found) {
+              (0, _object.set)(_this5, 'config.vpcId', null);
+            } else {
+              _this5.vpcDidChange();
+            }
+          }
+        });
+        this.fetch('Zone', 'Zones').then(function (zones) {
+          (0, _object.set)(_this5, 'zones', zones);
+          var selectedZone = (0, _object.get)(_this5, 'config.zone');
+
+          if (selectedZone) {
+            var found = zones.findBy('value', selectedZone);
+
+            if (!found) {
+              (0, _object.set)(_this5, 'config.zone', null);
+            } else {
+              _this5.zoneDidChange();
+            }
+          }
         });
       }
+    }),
+    diskCategoryChoicesDidChange: (0, _object.observer)('diskCategoryChoices.@each.value', function () {
+      var systemDiskCategory = (0, _object.get)(this, 'config.systemDiskCategory');
+      var found = (0, _object.get)(this, 'diskCategoryChoices').findBy('value', systemDiskCategory);
 
-      var region = (0, _object.get)(this, 'config.regionId');
+      if (!found) {
+        (0, _object.set)(this, 'config.systemDiskCategory', (0, _object.get)(this, 'diskCategoryChoices.firstObject.value'));
+      }
+
+      var diskCategory = (0, _object.get)(this, 'config.diskCategory');
+      found = (0, _object.get)(this, 'diskCategoryChoices').findBy('value', diskCategory);
+
+      if (!found) {
+        (0, _object.set)(this, 'config.diskCategory', (0, _object.get)(this, 'diskCategoryChoices.firstObject.value'));
+      }
+    }),
+    filteredVSwitches: (0, _object.computed)('vswitches.[]', 'config.zone', function () {
+      var zone = (0, _object.get)(this, 'config.zone');
+      return ((0, _object.get)(this, 'vswitches') || []).filter(function (swith) {
+        if (zone && zone !== swith.raw.ZoneId) {
+          return false;
+        }
+
+        return true;
+      });
+    }),
+    diskCategoryChoices: (0, _object.computed)('config.ioOptimized', function () {
+      return (0, _object.get)(this, 'config.ioOptimized') === 'none' ? NONE_OPT_DISK : OPT_DISK;
+    }),
+    bootstrap: function bootstrap() {
+      var config = (0, _object.get)(this, 'globalStore').createRecord({
+        type: 'aliyunecsConfig',
+        accessKeySecret: '',
+        instanceType: DEFAULT_INSTANCE_TYPE,
+        ioOptimized: 'optimized'
+      });
+      (0, _object.set)(this, 'model.engineInstallURL', 'http://dev-tool.oss-cn-shenzhen.aliyuncs.com/docker-install/1.13.1.sh');
+      (0, _object.set)(this, 'model.engineRegistryMirror', ['https://s06nkgus.mirror.aliyuncs.com']);
+      (0, _object.set)(this, 'model.aliyunecsConfig', config);
+    },
+    resetVswitch: function resetVswitch() {
+      var switches = (0, _object.get)(this, 'filteredVSwitches');
+      var selectedVSwitch = (0, _object.get)(this, 'config.vswitchId');
+
+      if (selectedVSwitch) {
+        var found = switches.findBy('value', selectedVSwitch);
+
+        if (!found) {
+          (0, _object.set)(this, 'config.vswitchId', null);
+        }
+      }
+    },
+    validate: function validate() {
+      this._super();
+
+      var errors = (0, _object.get)(this, 'model').validationErrors();
+      var intl = (0, _object.get)(this, 'intl');
+      var name = (0, _object.get)(this, 'model.name');
+      var sshPassword = (0, _object.get)(this, 'config.sshPassword');
+      var lower = /[a-z]/.test(sshPassword) ? 1 : 0;
+      var upper = /[A-Z]/.test(sshPassword) ? 1 : 0;
+      var number = /[0-9]/.test(sshPassword) ? 1 : 0;
+      var special = /[?+*$^().|<>';:\-=\[\]\{\},&%#@!~`\\]/.test(sshPassword) ? 1 : 0;
+
+      if (!name) {
+        errors.push('Name is required');
+      }
+
+      if (sshPassword && sshPassword.length < 8 || sshPassword.length > 30) {
+        errors.push(intl.t('nodeDriver.aliyunecs.errors.sshPasswordLengthNotValid'));
+      }
+
+      if (sshPassword && !/[?+*$^().|<>';:\-=\[\]\{\},&%#@!~`\\a-zA-Z0-9]+/.test(sshPassword)) {
+        errors.push(intl.t('nodeDriver.aliyunecs.errors.sshPasswordInvalidCharacter'));
+      }
+
+      if (sshPassword && lower + upper + number + special < 3) {
+        errors.push((0, _object.get)(this, 'intl').t('nodeDriver.aliyunecs.errors.sshPasswordFormatError'));
+      }
+
+      (0, _object.set)(this, 'errors', errors);
+      return errors.length === 0;
+    },
+    fetchAvailableResources: function fetchAvailableResources() {
+      var ecs = (0, _object.get)(this, 'ecsClient');
+      var region = (0, _object.get)(this, 'config.region');
+      var results = [];
+      var params = {
+        RegionId: region,
+        IoOptimized: (0, _object.get)(this, 'config.ioOptimized'),
+        SystemDiskCategory: (0, _object.get)(this, 'config.systemDiskCategory'),
+        DataDiskCategory: (0, _object.get)(this, 'config.diskCategory')
+      };
+
+      if ((0, _object.get)(this, 'config.zone')) {
+        params['ZoneId'] = (0, _object.get)(this, 'config.zone');
+      }
+
+      return new _rsvp.Promise(function (resolve, reject) {
+        ecs['describeAvailableResource'](params, function (err, res) {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          var zones = res['AvailableZones'];
+          zones.AvailableZone.forEach(function (zone) {
+            zone['AvailableResources']['AvailableResource'].forEach(function (resource) {
+              resource['SupportedResources']['SupportedResource'].forEach(function (support) {
+                if (support.Status === 'Available' && results.indexOf(support.Value) === -1) {
+                  results.pushObject(support.Value);
+                }
+              });
+            });
+          });
+          resolve(results);
+        });
+      });
+    },
+    fetch: function fetch(resource, plural) {
+      var _this6 = this;
+
+      var page = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+      var ecs = (0, _object.get)(this, 'ecsClient');
+      var region = (0, _object.get)(this, 'config.region');
       var results = [];
       var params = {
         PageSize: PAGE_SIZE,
         PageNumber: page
       };
-      var resultKey = 'Id';
 
       switch (resource) {
+        case 'InstanceType':
+          params = {};
+          break;
+
+        case 'VSwitch':
+          params.VpcId = (0, _object.get)(this, 'config.vpcId');
+          break;
+
+        case 'SecurityGroup':
+          params.VpcId = (0, _object.get)(this, 'config.vpcId');
+          params.RegionId = region;
+          break;
+
         case 'Zone':
           params = {
             RegionId: region
           };
-          break;
-
-        case 'KeyPair':
-          params = {
-            RegionId: region
-          };
-          resultKey = 'Name';
           break;
 
         default:
@@ -368,28 +443,20 @@ define("nodes/components/driver-skel/component", ["exports", "@ember/component",
         ecs["describe".concat(plural)](params, function (err, res) {
           if (err) {
             reject(err);
-            var errors = (0, _object.get)(_this3, 'errors') || [];
-            errors.pushObject(err.message || err);
-            (0, _object.set)(_this3, 'errors', errors);
             return;
           }
 
           var current = res["".concat(plural)][resource];
-
-          if (!(0, _object.get)(_this3, 'ecsClient')) {
-            (0, _object.set)(_this3, 'ecsClient', ecs);
-          }
-
           results.pushObjects(current.map(function (item) {
             return {
-              label: item["".concat(resource).concat(resultKey)],
-              value: item["".concat(resource).concat(resultKey)],
+              label: item["".concat(resource, "Id")],
+              value: item["".concat(resource, "Id")],
               raw: item
             };
           }));
 
           if (res.TotalCount > PAGE_SIZE * (page - 1) + current.length) {
-            return _this3.fetch(resource, plural, page + 1).then(function (array) {
+            return _this6.fetch(resource, plural, page + 1).then(function (array) {
               results.pushObjects(array);
               resolve(results);
             }).catch(function (err) {
